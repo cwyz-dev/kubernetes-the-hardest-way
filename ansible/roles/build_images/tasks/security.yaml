@@ -1,0 +1,10 @@
+- name: Generate SBOM
+  command: "syft {{ item.full_image_ref }} -o json"
+  register: sbom_output
+  loop: "{{ images_with_refs }}"
+  when: generate_sbom
+- name: Scan vulnerabilities
+  command: "grype {{ item.full_image_ref }} -o json"
+  register: vuln_output
+  loop: "{{ images_with_refs }}"
+  when: scan_vulnerabilities

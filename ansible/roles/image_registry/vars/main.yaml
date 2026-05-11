@@ -1,0 +1,5 @@
+registry_container_name: image-registry
+registry_image: registry:2
+registry_port: 5000
+registry_data_dir: /tmp/registry
+registry_host_ip: "0.0.0.0"

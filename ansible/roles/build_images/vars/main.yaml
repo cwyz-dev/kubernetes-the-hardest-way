@@ -1,0 +1,6 @@
+build_directory: /tmp/image_builds
+build_metrics_path: /tmp/build-metrics
+build_seed: "v1"
+cache_shard_seed: "default"
+sharp_map_version: "v1" 
+explain_build: false

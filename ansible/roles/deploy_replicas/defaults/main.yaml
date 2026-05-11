@@ -1,0 +1,7 @@
+image: "quay.io/podman/hello"
+tag: "latest"
+num_instances: 1
+deployment_group: "all"
+service_name: "hello"
+state: "started"
+restart: "always"

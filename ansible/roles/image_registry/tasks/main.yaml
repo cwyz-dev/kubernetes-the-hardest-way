@@ -1,0 +1,33 @@
+- name: Ensure registry data directory exists
+  ansible.builtin.file:
+    path: "{{ registry_data_dir }}"
+    state: directory
+    mode: "0755"
+
+- name: Pull latest registry image
+  containers.podman.podman_image:
+    name: "{{ registry_image }}"
+    force: "{{ registry_force_pull | default(false) }}"
+
+- name: Run container registry
+  containers.podman.podman_container:
+    name: "{{ registry_container_name }}"
+    image: "{{ registry_image }}"
+    state: started
+    recreate: "{{ registry_recreate | default(false) }}"
+    restart_policy: always
+    ports:
+      - "{{ registry_port }}:5000"
+    volumes:
+      - "{{ registry_data_dir }}:/var/lib/registry{{ registry_selinux_flag | default(':z') }}"
+    env: "{{ registry_env | default({}) }}"
+    log_driver: k8s-file
+
+- name: Wait for registry API to be ready
+  ansible.builtin.uri:
+    url: "http://localhost:5000/v2/"
+    status_code: [ 200, 401 ]
+  register: result
+  until: result.status in [ 200, 401 ]
+  retries: 12
+  delay: 5

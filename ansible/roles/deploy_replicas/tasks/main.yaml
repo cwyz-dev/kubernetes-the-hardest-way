@@ -1,0 +1,17 @@
+- name: Get the list of available machines
+  set_fact
+    available_machines: "{{ groups[deployment_group] }}"
+
+- name: Calculate number of instances per machine
+  set_fact:
+    containers_per: "{{ ( num_instances // ( available_machines | length ) ) if ( available_machines | length ) else 0 }}"
+    remaining: "{{ ( num_instances % ( available_machines | length ) ) }}"
+
+- name: Deploy instances on each machine
+  containers.podman.podman_container:
+    name: "{{ pod_name }}_{{ inventory_hostname }}_{{ item }}"
+    image: "{{ registry_url }}/{{ image }}:{{ tag }}"
+    state: "{{ state }}"
+    restart_policy: "{{ restart }}"
+  loop: "{{ range( 0, containers_per + ( 1 if ( available_machines.index( inventory_hostname ) < remaining ) else 0 ) ) | list }}"
+  when: inventory_hostname in available_machines

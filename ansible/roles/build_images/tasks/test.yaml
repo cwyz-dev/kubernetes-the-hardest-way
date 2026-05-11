@@ -1,0 +1,9 @@
+- name: Run tests
+  command: "podman run --rm {{ item.full_image_ref }} {{ item.test_command | default( true ) }}
+  register: test_results
+  loop: "{{ images_with_refs }}"
+- name: Fail tests
+  fail:
+    msg: "Tests failed for {{ item.item_name }}"
+  loop: "{{ test_results.results }}"
+  when: item.rc != 0

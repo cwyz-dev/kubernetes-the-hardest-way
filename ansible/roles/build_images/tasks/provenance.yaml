@@ -1,0 +1,11 @@
+- name: Sign images
+  command: "cosign sign { % if not enable_keyless % } --key {{ cosign_key_path }} { % endif % } {{ item.full_image_ref }}"
+  environment:
+    COSIGN_EXPERIMENTAL: "{{ '1' if enable_keyless else omit }}"
+  loop: "{{ images_with_refs }}"
+  when: enable_signing
+- name: Generate provenance
+  copy:
+    dest: "{{ build_metrics_path }}/{{ item.name }}/provenance.json"
+    content: "{{ lookup( 'template', 'provenance.json.j2' ) }}"
+  loop: "{{ images_with_refs }}"

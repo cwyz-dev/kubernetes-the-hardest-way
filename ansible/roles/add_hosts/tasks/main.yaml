@@ -1,0 +1,11 @@
+- name: Add host with variables
+  ansible.builtin.add_host:
+    name: "{{ newhost.name }}"
+    ansible_host: "{{ newhost.ip }}"
+    ansible_port: "{{ newhost.port | default(22) }}"
+    groups: "{{ newhost.groups }}"
+    ansible_user: "{{ newhost.user | default('ubuntu') }}"
+    ansible_connection: "{{ newhost.connection | default('ssh') }}"
+  loop: "{{ dynamic_hosts }}"
+  loop_control:
+    loop_var: newhost

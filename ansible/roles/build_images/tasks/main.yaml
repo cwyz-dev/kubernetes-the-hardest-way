@@ -1,0 +1,105 @@
+# PREFLIGHT
+- name: Ensure metrics directory exists
+  file:
+    path: "{{ build_metrics_path }}"
+    state: directory
+- name: Validate registry format
+  assert:
+    that:
+      - registry_url == "" or registry_url is match('^[a-zA-Z0-9.-]+(:[0-9]+)?$')
+- name: Wait for registry to become ready
+  uri:
+    url: "{{ registry_protocol }}://{{ registry_url }}/v2/"
+    status_code: [ 200, 401 ]
+    timeout: 5
+    validate_certs: false
+  register: registry_check
+  retries: 12
+  delay: 5
+  until: registry_check.status is [ 200, 401 ]
+  when:
+    - ( registry_url | length ) > 0
+    - not skip_registry_check
+
+# RESUME
+- name: Load completed images
+  set_fact:
+    completed_images: >-
+      {{
+        ( lookup( 'file', build_metrics_path + '/completed.log', errors='ignore' ) | default('') ).splitlines()
+        if ( lookup( 'file', build_metrics_path + '/completed.log', errors='ignore' ) != '' else []
+      }}
+# BUILD
+- name: Prepare image metadata
+  set_fact:
+    images_with_refs: >-
+      {{
+        images
+        |
+        map(
+          'combine',
+          {
+            'full_image_ref': (registry_url ~ '/' if registry_url else '' ) ~
+            ( image.final_name | default( 'local_' ~ image.name ) ) ~ ':' ~ ( image.tag | default( 'latest' ) )
+          }
+        )
+        |
+        list
+      }}
+  loop: " {{ images }} "
+  loop_control:
+    loop_var: image
+- name: Pre-pull cache
+  containers.podman.podman_image:
+    name: "{{ item.full_image_ref }}"
+    pull: true
+  loop: "{{ images_with_refs }}"
+  when: enable_registry_cache
+- name: Build images
+  containers.podman.podman_image:
+    name: "{{ item.full_image_ref }}"
+    path: "{{ build_directory }}/{{ item.name }}/context"
+    build:
+      file: "{{ build_directory }}/{{ item.name}}/Containerfile"
+      cache: true
+    push: false
+  loop: "{{ images_with_refs }}"
+  when:
+    - item.should_build | default( true )
+    - ( item.name not in completed_images ) | default( [] )
+
+- import_tasks: test.yaml
+  when: run_tests
+
+# PUSH
+- name: Push images
+  containers.podman.podman_image:
+    name: "{{ item.full_image_ref }}"
+    push: true
+    tls_verify: false
+  loop: "{{ images_with_refs }}"
+  throttle: "{{ push_parallelism }}"
+  when: item.should_build | defualt( true )
+- name: Mark completed
+  lineinfile:
+    path: "{{ build_metrics_path }}/completed.log"
+    line: "{{ item.name }}"
+    create: yes
+  loop: "{{ images_with_refs }}"
+
+- import_tasks: security.yaml
+  when: generate_sbom or scan_vulnerabilities
+
+- import_tasks: provenance.yaml
+  when: enable_provenance or enable_signing
+
+# OBSERVABILITY
+- name: Save timing metrics
+  copy:
+    dest: "{{ build_metrics_path }}/timings.json"
+    content: "{{ build_durations | default( {} ) | to_nice_json }}"
+- name: Write summary
+  copy:
+    dest: "{{ build_metrics_path }}/summary.json"
+    content: 
+      {{ { "total": ( images_with_refs | length ), "completed": ( completed_images | length ) } | to_nice_json }}

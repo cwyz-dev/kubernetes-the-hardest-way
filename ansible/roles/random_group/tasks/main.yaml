@@ -1,0 +1,11 @@
+- name: " Pick {{ selection_count }} random hosts"
+  set_fact:
+    chosen_hosts: "{{ (groups[origin_group_name] | shuffle)[0:selection_count] }}"
+
+- name: "Add picked hosts to {{ target_group_name }}"
+  add_host:
+    name: "{{ pickedhost }}"
+    groups: "{{ target_group_name }}"
+  loop: "{{ chosen_hosts }}"
+  loop_control:
+    loop_var: pickedhost
