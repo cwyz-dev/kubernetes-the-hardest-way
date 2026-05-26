@@ -1,0 +1,61 @@
+- name: Select host for image repo hosts: localhost gather_facts: false roles:
+    - role: random_group
+      vars:
+        origin_group_name: "podman_runners"
+        target_group_name: "registry_hosts" # All group names are in plural
+        selection_count: 1 # Only need a single host for the image registry
+- name: Create image registry
+  hosts: registry_hosts
+  gather_facts: false
+  roles:
+    - role: image_registry
+  post_tasks:
+    - name: Wait for registry API to be reachable
+      delegate_to: localhost
+      ansible.builtin.uri:
+        url: "http://{{ hostvars[ groups[ 'registry_hosts' ][ 0 ] ].ansible_host }}:5000/v2/"
+        status_code: [ 200, 401 ]
+      register: registry_ready
+      retries: 12
+      delay: 5
+      until: registry_ready.status in [ 200, 401 ]
+- name: Select host(s) for image building
+  hosts: localhost
+  gather_facts: false
+  roles:
+    - role: random_group
+      vars:
+        origin_group_name: "podman_runners"
+        target_group_name: "build_hosts"
+- name: Build images
+  hosts: "build_hosts"
+  gather_facts: false
+  strategy: free
+  roles:
+    - role: build_images
+      vars:
+        registry_url: "{{ hostvars[ groups[ 'registry_hosts' ][ 0 ] ].ansible_host }}:5000/v2/"
+        images:
+          - name: alpine
+          - name: builder
+            dependencies: [ cacertificates ]
+          - name: cacertificates
+            dependencies: [ alpine ]
+          - name: controllermanager
+            dependencies: [ builder, cacertificates, kubernetes ]
+          - name: etcd
+            dependencies: [ builder, cacertificates, fetch, gobuilder ]
+          - name: fetch
+            dependencies: [ cacertificates ]
+          - name: gobuilder
+            dependencies: [ builder ]
+          - name: kubeapi
+            dependencies: [ builder, cacertificates, kubernetes ]
+          - name: kubernetes
+            dependencies: [ fetch, gobuilder ]
+          - name: loadbalancer
+            dependencies: [ builder, cacertificates, fetch, luabuilder ]
+          - name: luabuilder
+            dependencies: [ builder, fetch ]
+          - name: scheduler
+            dependencies: [ builder, cacertificates, kubernetes ]

@@ -1,0 +1,12 @@
+- name: "Deploy {{ cluster_name | default( '' ) }} cluster
+  import_playbook: deploy_randomlyallocatedreplicas.yaml
+  vars:
+    service_name: "{{ cluster_name }}"
+    serivce_count: "{{ deploy_count }}"
+    service_image: "local_{{ cluster_name }}"
+- name: "Deploy {{ cluster_name | default( '' ) }} load balancer(s)"
+  import_playbook: deploy_randomlyallocatedreplicas.yaml
+  vars:
+    service_name: "{{ cluster_name }}_loadbalancer"
+    service_count: "{{ loadbalancer_count }}"
+    service_image: local_loadbalancer

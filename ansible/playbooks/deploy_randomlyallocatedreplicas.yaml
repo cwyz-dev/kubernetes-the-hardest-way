@@ -1,0 +1,20 @@
+- name: "Select {{ service_count }} host(s) for {{ service_name }}"
+  hosts: localhost
+  gather_facts: false
+  roles:
+    - role: random_group
+      vars:
+        origin_group_name: "podman_runners"
+        target_group_name: "{{ service_name }}_hosts"
+        selection_count: "{{ service_count }}"
+- name: "Deploy {{ service_count }} {{ service_name }} nodes"
+  hosts: "{{ service_name }}_hosts"
+  gather_facts: false
+  roles:
+    - role: deploy_replicas
+      vars:
+        registry_url: "{{ hostvars[ groups[ 'registry_hosts' ][ 0 ] ].ansible_host }}:5000/v2/"
+        image: "{{ service_image }}"
+        num_instances: "{{ service_count }}"
+        deployment_group: "{{ service_name }}_hosts"
+        pod_name: "{{ service_name }}"

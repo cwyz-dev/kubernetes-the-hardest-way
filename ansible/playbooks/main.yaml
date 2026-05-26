@@ -1,0 +1,12 @@
+- name: Build necessary images
+  import_playbook: build.yaml
+- name: Deploy containers
+  import_playbook: deploy.yaml
+- name: Cleanup
+  hosts: podman_runners
+  gather_facts: false
+  tasks:
+    - name: Shutdown all containers
+      shell: podman container rm -af
+    - name: Clear all images
+      shell: podman image rm -af

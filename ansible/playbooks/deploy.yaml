@@ -1,0 +1,16 @@
+- name: Deploy 'etcd' cluster
+  import_playbook: deploy_balancedcluster.yaml
+  vars:
+    cluster_name: etcd
+    deploy_count: 9
+    load_balancer_count: 2
+- name: List all running containers on each host
+  hosts: podman_runners
+  gather_facts: false
+  tasks:
+    - name: Generate list of containers
+      shell: podman container ls -a
+      register: containers
+    - name: Print all containers
+      debug:
+        msg: "{{ containers.stdout_lines }}"
